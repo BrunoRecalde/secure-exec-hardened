@@ -1,0 +1,7 @@
+*.enc
+*.json
+*.log*
+*.bak
+*.tmp
+__pycache__/
+.DS_Store
