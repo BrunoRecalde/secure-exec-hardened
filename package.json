@@ -1,0 +1,1 @@
+{"bin":{"secure-exec":"./bin/secure-exec"},"description":"MCP stdio broker that runs allowlisted commands with credentials injected as env vars. Python stdlib-only.","files":["server.py","bin/"],"license":"UNLICENSED","name":"secure-exec-hardened","private":true,"version":"2.0.0"}

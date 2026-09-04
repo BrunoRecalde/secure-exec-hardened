@@ -4,6 +4,66 @@ MCP stdio broker that runs allowlisted commands with credentials injected as
 environment variables. Credentials live in an encrypted store; they are never
 printed, only key names are ever exposed.
 
+## Download / Install
+
+This repo is PRIVATE. Every path below requires access: `gh auth login`
+with a token that has the `repo` scope, or an invitation as a collaborator.
+Unauthenticated downloads will fail with 404.
+
+### Option A — npm / npx (node shim around server.py)
+
+```bash
+gh auth login  # needs `repo` scope for this private repo
+npx -y github:BrunoRecalde/secure-exec-hardened
+# or install globally:
+npm i -g github:BrunoRecalde/secure-exec-hardened
+secure-exec
+```
+
+The `secure-exec` bin is a zero-dependency node shim that spawns
+`python3 <package>/server.py` with stdio inherited. Requires `python3`
+in `PATH`.
+
+### Option B — pip / uvx (Python stdlib-only, no dependencies)
+
+```bash
+gh auth login  # needs `repo` scope for this private repo
+pip install "git+https://github.com/BrunoRecalde/secure-exec-hardened.git@v2.0.0"
+python3 -c "import server; print(server.TOOLS)"
+# or run the broker directly after cloning:
+python3 server.py
+# uvx equivalent:
+uvx --from "git+https://github.com/BrunoRecalde/secure-exec-hardened.git@v2.0.0" --help
+```
+
+`server.py` is the canonical entry point (stdlib-only). The
+`bin/secure-exec` wrapper also works for pipx-style installs.
+
+### Option C — git clone (direct)
+
+```bash
+gh auth login  # needs `repo` scope for this private repo
+gh repo clone BrunoRecalde/secure-exec-hardened
+python3 secure-exec-hardened/server.py
+```
+
+### opencode.json example (installed bin)
+
+```json
+{
+  "mcp": {
+    "secure-exec": {
+      "type": "local",
+      "command": ["secure-exec"],
+      "enabled": true
+    }
+  }
+}
+```
+
+If the bin is not on `PATH`, point `command` at the absolute paths
+instead: `["python3", "/path/to/secure-exec-hardened/server.py"]`.
+
 ## Install as a local MCP server
 
 Copy `server.py` somewhere durable, e.g. `~/.opencode/mcp/secure-exec/server.py`,

@@ -1,0 +1,19 @@
+[project]
+name = "secure-exec-hardened"
+version = "2.0.0"
+description = "MCP stdio broker that runs allowlisted commands with credentials injected as env vars. Python stdlib-only."
+requires-python = ">=3.9"
+license = { text = "UNLICENSED" }
+
+# NOTE: server.py is a single-file stdlib-only MCP entry point and stays the
+# canonical module. No [project.scripts] entry is defined on purpose: mapping
+# a console script to a renamed import would risk breaking the MCP server.
+# Use `python3 server.py` directly, or the `bin/secure-exec` wrapper (works
+# for pipx / git installs too).
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = ["server"]
