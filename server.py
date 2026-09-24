@@ -11,6 +11,7 @@ import json
 import os
 import re
 import secrets
+import shlex
 import subprocess
 import sys
 import time
@@ -289,6 +290,20 @@ def redact_credentials(text):
     return text
 
 
+def _safe_command_preview(cmd, inject_keys):
+    """Render readable argv without exposing stored credential values."""
+    safe = [str(arg) for arg in cmd] if isinstance(cmd, list) else []
+    keys = [key for key in inject_keys if isinstance(key, str)] if isinstance(inject_keys, list) else []
+    for key in keys:
+        value = creds.get(key)
+        if not isinstance(value, str) or not value:
+            continue
+        for variant in sorted(_secret_variants(value), key=len, reverse=True):
+            safe = [arg.replace(variant, f"${{{key}}}") for arg in safe]
+    safe = [redact_credentials(arg) for arg in safe]
+    return safe, " ".join(shlex.quote(arg) for arg in safe), keys
+
+
 def _audit_log(entry: dict):
     """F9: append-only audit log, 0600, names only, rotate past 5MB to .1."""
     try:
@@ -397,14 +412,14 @@ TOOLS = [
     },
     {
         "name": "exec_with_creds",
-        "description": "Execute an allowlisted command (curl, aws, python3, node, npx) with injected credentials via environment variables. Argv array only; shell needs allow_shell:true. Returns {stdout, stderr, exit_code}.",
+        "description": "Execute an allowlisted command (curl, aws, python3, node, npx) with injected credentials via environment variables. Argv array only; shell needs allow_shell:true. Returns a readable, secret-redacted command line and credential key names before stdout/stderr. Never expose credential values.",
         "inputSchema": {
             "type": "object",
             "properties": {
                 "command": {
                     "type": "array",
                     "items": {"type": "string"},
-                    "description": "Command argv array, e.g. [\"curl\", \"-u\", \"$USER:$PASS\", \"https://example.com\"]"
+                    "description": "Command argv array. Prefer credential placeholders like ${KEY}; previews show them symbolically and never reveal stored values."
                 },
                 "inject": {
                     "type": "array",
@@ -473,8 +488,22 @@ def handle_exec(rid, args):
     allow_shell = args.get("allow_shell", False)
     inject = args.get("inject", [])
 
+    def _preview(cmd, keys):
+        try:
+            safe, readable, clean_keys = _safe_command_preview(cmd, keys)
+        except Exception:
+            safe, readable = [], "[preview unavailable]"
+            clean_keys = [k for k in (keys or []) if isinstance(k, str)]
+        return {
+            "command_preview": safe,
+            "inject_keys": clean_keys,
+            "visibility": "COMMAND: " + readable + "\nCREDENTIAL KEYS: " + ", ".join(clean_keys),
+        }
+
     def err_payload(msg):
-        return {"content": [{"type": "text", "text": json.dumps({"error": redact_credentials(msg)})}]}
+        d = {"error": redact_credentials(msg)}
+        d.update(_preview(raw_cmd, inject))
+        return {"content": [{"type": "text", "text": json.dumps(d)}]}
 
     if not isinstance(inject, list) or any(not isinstance(k, str) for k in inject):
         _audit_attempt(raw_cmd, [], -2, 0, 0)
@@ -501,25 +530,29 @@ def handle_exec(rid, args):
             )
             stdout = _truncate(redact_credentials(r.stdout or ""))
             stderr = _truncate(redact_credentials(r.stderr or ""))
-            out = {"stdout": stdout, "stderr": stderr, "exit_code": int(r.returncode)}
+            out = _preview(cmd, inject)
+            out.update({"stdout": stdout, "stderr": stderr, "exit_code": int(r.returncode)})
             _audit_attempt(cmd, inject, int(r.returncode),
                            len(stdout.encode("utf-8", errors="ignore")),
                            len(stderr.encode("utf-8", errors="ignore")))
         except subprocess.TimeoutExpired:
-            out = {"stdout": "", "stderr": redact_credentials(f"timeout ({timeout}s)"), "exit_code": -1}
+            out = _preview(cmd, inject)
+            out.update({"stdout": "", "stderr": redact_credentials(f"timeout ({timeout}s)"), "exit_code": -1})
             _audit_attempt(cmd, inject, -1, 0, 0)
         except FileNotFoundError:
-            out = {"stdout": "", "stderr": "command not found", "exit_code": -1}  # F15: no path echo
+            out = _preview(cmd, inject)
+            out.update({"stdout": "", "stderr": "command not found", "exit_code": -1})  # F15: no path echo
             _audit_attempt(cmd, inject, -1, 0, 0)
         except Exception:
             print("exec failed", file=sys.stderr)  # never log values/paths
-            out = {"stdout": "", "stderr": "execution failed", "exit_code": -1}
+            out = _preview(cmd, inject)
+            out.update({"stdout": "", "stderr": "execution failed", "exit_code": -1})
             _audit_attempt(cmd, inject, -1, 0, 0)
     finally:
         for k in inject:  # F15: drop credential copies post-run (best-effort; strs are immutable)
             env.pop(k, None)
     return respond(rid, {
-        "content": [{"type": "text", "text": json.dumps(out)}]
+        "content": [{"type": "text", "text": out["visibility"] + "\n" + json.dumps(out, ensure_ascii=False)}]
     })
 
 

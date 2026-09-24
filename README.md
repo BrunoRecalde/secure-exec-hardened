@@ -27,7 +27,7 @@
 
 ## What
 
-`secure-exec-hardened` is a single-file, stdlib-only MCP server (`server.py`) plus a zero-dependency Node shim (`bin/secure-exec`).
+`secure-exec-hardened` is a single-file, stdlib-only MCP server (`server.py`) plus a zero-dependency Node shim (`bin/secure-exec`). The GitHub `main` branch is the canonical source; release `v2.0.0` is a snapshot of the earlier version.
 
 It exposes two tools:
 
@@ -80,10 +80,10 @@ secure-exec
 
 The `secure-exec` bin is a zero-dependency Node shim that spawns `python3 <package>/server.py` with stdio inherited.
 
-### Option C — pip from git (stdlib-only, no dependencies)
+### Option C — pip from GitHub (stdlib-only, no dependencies)
 
 ```bash
-pip install "git+https://github.com/BrunoRecalde/secure-exec-hardened.git@v2.0.0"
+pip install "git+https://github.com/BrunoRecalde/secure-exec-hardened.git@main"
 python3 -c "import server; print(server.TOOLS)"
 # or run the broker directly after cloning:
 python3 server.py
@@ -97,6 +97,8 @@ python3 secure-exec-hardened/server.py
 ```
 
 > `server.py` is the canonical entry point. `bin/secure-exec` is a convenience wrapper for npm/npx and `PATH`-based setups.
+
+To update a direct `server.py` installation, pull the latest `main` and replace the installed `server.py`, then restart OpenCode. No credential-store or configuration files need to be copied.
 
 ## OpenCode configuration
 
@@ -288,4 +290,4 @@ If MIT is intended, the maintainer needs to add a `LICENSE` (MIT) file — it is
 ## Links
 
 - Repo: <https://github.com/BrunoRecalde/secure-exec-hardened>
-- Release v2.0.0: <https://github.com/BrunoRecalde/secure-exec-hardened/releases/tag/v2.0.0>
+- Release v2.0.0 (previous snapshot): <https://github.com/BrunoRecalde/secure-exec-hardened/releases/tag/v2.0.0>
